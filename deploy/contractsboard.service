@@ -1,0 +1,17 @@
+[Unit]
+Description=ContractsBoard partnership portal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=contractsboard
+Group=contractsboard
+WorkingDirectory=/opt/contractsboard
+ExecStart=/opt/contractsboard/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 3000 --workers 1 --no-access-log
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

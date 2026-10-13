@@ -1,5 +1,7 @@
 # Onnivation Partnership Portal
 
+For container-free Vercel hosting with Notion and Drive as sources of truth, see [DEPLOYMENT.md](DEPLOYMENT.md#vercel-hosted-mcp-portal-without-a-container). The local Python/SQLite launcher below remains available for development.
+
 Finance portal with a partnership board, contract uploads, review notes, and an activity log. Notion and Google Drive operations use their hosted MCP servers through the official Python MCP SDK. Refresh reads source data; user-initiated status moves and uploads perform narrowly defined writes.
 
 ## Run or upgrade locally

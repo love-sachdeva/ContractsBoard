@@ -1,6 +1,46 @@
 # GitHub-backed deployment
 
-The current application is a Python server with SQLite, encrypted connection grants, and staged uploads. It needs a persistent volume and a single running worker. A static website or an ephemeral serverless filesystem does not provide the required persistence.
+The repository has two Python entrypoints. `app:app` is the original local SQLite server and needs a persistent volume and one worker. `hosted_app:app` serves the same portal on Vercel with Notion and Drive as the primary sources and a small managed store for grants and workflow metadata.
+
+## Vercel: hosted MCP portal without a container
+
+The `hosted_app:app` FastAPI entrypoint uses Notion as the partner source and Drive as the document source. Upstash Redis stores encrypted OAuth grants, selected source IDs, small review and activity records, a Drive listing index, and temporary upload chunks. SQLite and a persistent disk are not used by this entrypoint. The local `app:app` launcher still works as a separate development mode.
+
+Vercel detects the Python entrypoint from `pyproject.toml`; `vercel.json` sets the function duration. The browser sends each contract in 1 MB chunks, then one function assembles it and calls the Drive MCP `create_file` tool. The 20 MB portal limit remains in effect. Chunks expire after 30 minutes and are removed after completion. Review metadata in Redis is not present in the Notion page; retain Redis if you need the review history.
+
+1. Use a Vercel **Pro** team for this Onnivation business portal. The currently connected Vercel account is on Hobby, which Vercel restricts to personal, non-commercial projects. Connect `love-sachdeva/ContractsBoard` as a Python project on the Pro team.
+2. Provision an Upstash Redis store in the Vercel Marketplace and link it to the project. Ensure the project has `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for production.
+3. Set `APP_ENV=production`, `PUBLIC_BASE_URL=https://<permanent-production-host>`, `PORTAL_USERNAME=finance`, `PORTAL_PASSWORD`, `FERNET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `DEMO_MODE=0` as project environment variables. Generate a Fernet key once and retain it across deployments. `PUBLIC_BASE_URL` must be the permanent production alias, not a changing preview URL.
+4. In the Google Cloud Web OAuth client, register `<PUBLIC_BASE_URL>/auth/google/callback` exactly. Deploy, log in, connect Notion and Drive under Settings, select the existing sources, then click Refresh & verify sources.
+5. Test one status move and one harmless PDF/DOCX upload in the live accounts, check the exact Notion page and Drive folder, then verify grant persistence after a redeploy. Keep a secure backup of `FERNET_KEY`.
+
+The hosted entrypoint has been locally tested against fixture providers and a fake key-value store; a production build, live OAuth, and live write checks still require the Pro project and connected accounts. Do not route live finance traffic to a preview deployment with a different OAuth origin.
+
+## Small setup without Docker or Render
+
+The simplest way to try the real integrations is to run the Python process on your own computer and expose port 3000 through a stable HTTPS tunnel. The computer must stay on while the finance portal is in use; its `local-data` directory holds the database, uploads, and encrypted grants. For an always-on portal, run the same process on a small Linux VM instead (instructions below). Neither path uses a container.
+
+### On the existing Mac, for a live trial
+
+1. Install Tailscale and sign in. Enable Funnel in the Tailscale admin DNS settings, then run `tailscale funnel --bg 3000`. `tailscale funnel status` shows the stable `https://...ts.net` URL. Funnel makes the portal reachable from the internet, so set a strong portal password before enabling it.
+2. In the project's `.env`, set `APP_ENV=production`, `PUBLIC_BASE_URL` to that exact HTTPS origin (no trailing path), `DEMO_MODE=0`, `PORTAL_PASSWORD` to a strong password, `FERNET_KEY` to a stable Fernet key, and your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Keep `.env` and `local-data` off GitHub. Preserve any existing Fernet key if this instance already holds grants.
+3. Install locked dependencies in a virtual environment and run one worker, bound only to loopback:
+
+   ```sh
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -r requirements.lock
+   .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 3000 --workers 1 --no-access-log
+   ```
+
+4. Register `<PUBLIC_BASE_URL>/auth/google/callback` in Google Cloud's Web OAuth client. Open the HTTPS portal, sign in, and use Settings to connect Notion and Drive and verify the sources. The OAuth redirect must use the HTTPS URL even though Uvicorn listens locally.
+
+After a reboot, restart the Python process. Tailscale Funnel resumes if configured with `--bg`, but it cannot serve the portal if the Python process or Mac is off. A temporary/random tunnel URL is unsuitable for OAuth because the registered callback and `PUBLIC_BASE_URL` must match.
+
+### On a small Linux VM, for an always-on portal
+
+Use a VM with Python 3.12+, a persistent disk, and a DNS name. Clone this repository into `/opt/contractsboard`, create `/opt/contractsboard/.venv`, install `requirements.lock`, and keep `/opt/contractsboard/.env` private. Set `DATA_DIR=/var/lib/contractsboard` in that file, create that directory owned by a dedicated service user, and set the production variables described below. Run the process with systemd using the example in [`deploy/contractsboard.service`](deploy/contractsboard.service); replace the user and paths if your host differs. Point the DNS name at the VM and serve HTTPS through Caddy using [`deploy/Caddyfile`](deploy/Caddyfile), substituting the real hostname. The app listens on `127.0.0.1:3000`; only Caddy accepts outside connections. Register `https://your-hostname/auth/google/callback` in Google Cloud and set `PUBLIC_BASE_URL=https://your-hostname`. Keep one worker and back up `DATA_DIR` and the Fernet key.
+
+The VM and Mac options run the existing code directly; they still require an always-running Python process and persistent local storage. An ordinary static GitHub Pages/Vercel upload cannot execute this application's OAuth callback and upload routes.
 
 ## GitHub
 
