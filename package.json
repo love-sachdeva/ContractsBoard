@@ -1,0 +1,7 @@
+{
+  "name": "onnivation-partnership-portal",
+  "private": true,
+  "scripts": {
+    "dev": "python3 scripts/dev_server.py"
+  }
+}

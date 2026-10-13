@@ -1,0 +1,45 @@
+# Optional deployment blueprint. Applying this provisions paid compute and storage.
+# Review the hosting plan in your Render account before applying it.
+services:
+  - type: web
+    name: onnivation-partnership-portal
+    runtime: docker
+    plan: 0.5c-512mb
+    numInstances: 1
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    disk:
+      name: portal-state
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: PORT
+        value: '3000'
+      - key: DEMO_MODE
+        value: '0'
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: PORTAL_USERNAME
+        value: finance
+      - key: PORTAL_PASSWORD
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: NOTION_DATA_SOURCE_ID
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_UPLOAD_FOLDER_ID
+        sync: false
+      - key: RESELLER_TEMPLATE_ID
+        sync: false
+      - key: LOI_TEMPLATE_ID
+        sync: false
